@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Home Card Printer</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Card Printer">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<meta name="theme-color" content="#f3f1ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181c" media="(prefers-color-scheme: dark)">
+<style>
+/* Layout: one working column on phones, a two-pane bench (list | settings) on iPad and up. */
+:root{
+  --bg:#f3f1ec; --panel:#fffdf9; --ink:#1d1f24; --muted:#636672; --line:#dcd8cf;
+  --accent:#2f5d8a; --accent-ink:#ffffff; --ok:#2e7d4f; --warn:#a4561b; --bad:#b3261e;
+  --field:#ffffff; --chip:#ebe7de;
+  --f-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#16181c; --panel:#1f2228; --ink:#eceae4; --muted:#a3a6b0; --line:#343843;
+  --accent:#7fb0e0; --accent-ink:#0f1720; --ok:#6fc596; --warn:#e3a066; --bad:#f08a80;
+  --field:#262a31; --chip:#2b2f37; color-scheme:dark;}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:max(24px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding-block:18px 10px;max-width:1180px;margin:0 auto}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+header .sub{color:var(--muted);font-size:13px}
+main{display:grid;gap:16px;max-width:1180px;margin:0 auto;grid-template-columns:1fr}
+@media (min-width:900px){main{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:600}
+textarea,input[type=number],select{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%}
+textarea{min-height:230px;font:14px/1.4 var(--f-mono);resize:vertical}
+textarea:focus,input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+label.chk{display:flex;gap:10px;align-items:center;min-height:36px}
+label.chk input{width:22px;height:22px;accent-color:var(--accent)}
+button,.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:9px;padding:11px 16px;min-height:44px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+button:disabled{opacity:.5;cursor:default}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.files{display:flex;flex-wrap:wrap;gap:6px}
+.files span{background:var(--chip);border-radius:6px;padding:3px 8px;font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;min-height:32px}
+#log{font:12.5px/1.45 var(--f-mono);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;white-space:pre-wrap;margin:0}
+.bad{color:var(--bad)}.ok{color:var(--ok)}.warn{color:var(--warn)}
+#parts{display:flex;flex-direction:column;gap:8px}
+.part{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px}
+.part b{flex:1 1 180px;font-variant-numeric:tabular-nums}
+.part button{min-height:40px;padding:8px 12px}
+progress{width:100%;height:10px;accent-color:var(--accent)}
+#preview{width:100%;max-width:260px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Home Card Printer</h1>
+  <span class="sub">Print-ready PDFs for blank poker cards on the Canon G620</span>
+</header>
+<main>
+  <section aria-labelledby="h-cards">
+    <h2 id="h-cards">1 · Cards to print</h2>
+    <textarea id="deck" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste a decklist, one card per line:
+1 Sol Ring (CMM) 410
+1 Rhystic Study
+1 Delver of Secrets
+
+From Moxfield: Export → Copy for MTGA, then paste here."></textarea>
+    <p class="hint">Moxfield links can't be read from an iPad, because Moxfield blocks outside apps. Use Export → <b>Copy for MTGA</b> and paste the list. Set codes and numbers keep your exact printings.</p>
+    <div class="row">
+      <label class="btn" for="art">Add your own art…</label>
+      <input id="art" type="file" accept="image/*" multiple hidden>
+      <button id="clearArt" type="button">Clear art</button>
+    </div>
+    <p class="hint">Full card images with the border. Name a file <code>3x Name.png</code> for 3 copies. <code>Name [Back].png</code> becomes the back of <code>Name.png</code>.</p>
+    <div class="files" id="fileList"></div>
+
+    <h2>2 · Make the PDFs</h2>
+    <div class="row">
+      <button id="test" type="button">Make 1-card test</button>
+      <button id="go" type="button" class="primary">Make print PDFs</button>
+      <button id="stop" type="button" hidden>Stop</button>
+    </div>
+    <progress id="prog" value="0" max="1" hidden></progress>
+    <div id="parts"></div>
+    <pre id="log" aria-live="polite">Ready.</pre>
+  </section>
+
+  <section aria-labelledby="h-set">
+    <h2 id="h-set">Settings</h2>
+    <label class="chk"><input type="checkbox" id="skip_basics"> Skip basic lands</label>
+    <label class="chk"><input type="checkbox" id="one_each"> Print 1 of each (ignore quantities)</label>
+    <div class="grid2">
+      <label class="f">Card backs
+        <select id="back_mode">
+          <option value="none">None (double-faced backs only)</option>
+          <option value="standard">Standard Magic back</option>
+          <option value="file">My own back image</option>
+        </select>
+      </label>
+      <label class="f">Cards per part
+        <input type="number" id="batch_size" min="1" max="200" step="1">
+      </label>
+    </div>
+    <div class="row" id="backFileRow" hidden>
+      <label class="btn" for="backFile">Choose back image…</label>
+      <input id="backFile" type="file" accept="image/*" hidden>
+      <span class="hint" id="backFileName">No back image chosen</span>
+    </div>
+    <label class="chk"><input type="checkbox" id="backs_reverse"> Reverse backs order</label>
+    <div class="grid2">
+      <label class="f">Contrast (1.0 = unchanged)
+        <input type="number" id="contrast" min="0.5" max="2" step="0.05">
+      </label>
+      <label class="f">Color saturation
+        <input type="number" id="saturation" min="0.5" max="2" step="0.05">
+      </label>
+    </div>
+
+    <details>
+      <summary>Alignment fixes</summary>
+      <p class="hint">Only change these if every card comes out shifted the same way. Make a 1-card test after each change.</p>
+      <div class="grid2">
+        <label class="f">Move card right (mm)<input type="number" id="shift_right_mm" step="0.1"></label>
+        <label class="f">Move card down (mm)<input type="number" id="shift_down_mm" step="0.1"></label>
+        <label class="f">Rotate clockwise (°)<input type="number" id="rotate_deg" step="0.1"></label>
+        <label class="f">Card size (%)<input type="number" id="scale_pct" step="0.1" min="90" max="110"></label>
+      </div>
+      <p class="hint">Card size is for printing straight from the iPad. If the printer enlarges borderless pages more or less than the Windows driver's 4th notch, cards come out too big or too small. Lower it if the card's edge is cut off; raise it if a white edge shows all round.</p>
+      <h2 style="margin-top:6px">Backs</h2>
+      <div class="grid2">
+        <label class="f">Move back right (mm)<input type="number" id="back_shift_right_mm" step="0.1"></label>
+        <label class="f">Move back down (mm)<input type="number" id="back_shift_down_mm" step="0.1"></label>
+        <label class="f">Rotate back clockwise (°)<input type="number" id="back_rotate_deg" step="0.1"></label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Preview of the last page made</summary>
+      <img id="preview" alt="Preview of the last rendered page">
+    </details>
+
+    <details open>
+      <summary>How to print</summary>
+      <ol class="steps">
+        <li>Load up to 20 blank uncoated cards in the <b>rear tray</b>, portrait, with the guide snug.</li>
+        <li>Tap <b>Print / Share</b> on a part, then <b>Print</b>. Pick the G620, paper size <b>Square 3.5×3.5" (89×89 mm)</b>, borderless if offered, and the heaviest paper type listed.</li>
+        <li>From a Windows laptop: tap <b>Save</b>, open the PDF in Acrobat and use the <b>MTG Card</b> preset at <b>Actual size</b>.</li>
+        <li>Backs: let fronts dry, flip the stack sideways like a book page, reload, print the BACKS file.</li>
+      </ol>
+    </details>
+  </section>
+</main>
+
+<script>
+"use strict";
+// ---- layout, copied from the Scribus file "One space to the left - black bleed.sla" (inches)
+const L = {page:3.5, cx:0.5815, cy:0.0269, cw:2.3823, ch:3.3180, ex:0.43, ey:-0.12, ew:2.68, eh:3.74};
+const DPI = 600, PX = i => Math.round(i * DPI), PAGE_PX = PX(L.page);
+const BASICS = new Set(["plains","island","swamp","mountain","forest","wastes","snow-covered plains",
+  "snow-covered island","snow-covered swamp","snow-covered mountain","snow-covered forest","snow-covered wastes"]);
+const DFC_LAYOUTS = new Set(["transform","modal_dfc","double_faced_token","reversible_card","art_series"]);
+const STANDARD_BACK = "https://backs.scryfall.io/png/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.png";
+const DEFAULTS = {skip_basics:true, one_each:false, back_mode:"none", batch_size:20, backs_reverse:false,
+  contrast:1, saturation:1, shift_right_mm:0, shift_down_mm:0, rotate_deg:0, scale_pct:100,
+  back_shift_right_mm:0, back_shift_down_mm:0, back_rotate_deg:0};
+
+const $ = id => document.getElementById(id);
+const logEl = $("log");
+function log(msg, cls){ const line = document.createElement("span"); if (cls) line.className = cls;
+  line.textContent = msg + "\n"; logEl.appendChild(line); logEl.scrollTop = logEl.scrollHeight; }
+function clearLog(){ logEl.textContent = ""; }
+
+// ---- settings (remembered on this iPad)
+function store(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){ return null; } }
+let S = Object.assign({}, DEFAULTS);
+try { Object.assign(S, JSON.parse(store("hcp-settings") || "{}")); } catch(e){}
+for (const k of Object.keys(DEFAULTS)){
+  const el = $(k); if (!el) continue;
+  if (el.type === "checkbox") el.checked = !!S[k]; else el.value = S[k];
+  el.addEventListener("change", () => {
+    S[k] = el.type === "checkbox" ? el.checked : (el.tagName === "SELECT" ? el.value : (parseFloat(el.value) || 0));
+    if (k === "batch_size") S[k] = Math.max(1, Math.round(S[k]) || 20);
+    if (k === "scale_pct" && !S[k]) S[k] = 100;
+    store("hcp-settings", JSON.stringify(S)); syncBackRow();
+  });
+}
+const draft = store("hcp-deck"); if (draft) $("deck").value = draft;
+$("deck").addEventListener("input", () => store("hcp-deck", $("deck").value));
+function syncBackRow(){ $("backFileRow").hidden = S.back_mode !== "file"; }
+syncBackRow();
+
+// ---- own art
+let artFiles = [], backFile = null;
+$("art").addEventListener("change", e => { artFiles = artFiles.concat([...e.target.files]); e.target.value = ""; showFiles(); });
+$("clearArt").addEventListener("click", () => { artFiles = []; showFiles(); });
+$("backFile").addEventListener("change", e => { backFile = e.target.files[0] || null; $("backFileName").textContent = backFile ? backFile.name : "No back image chosen"; });
+function showFiles(){ const fl = $("fileList"); fl.textContent = "";
+  for (const f of artFiles){ const s = document.createElement("span"); s.textContent = f.name; fl.appendChild(s); } }
+
+// ---- decklist parsing (same rules as the PC program)
+const LINE_RE = /^\s*(?:(\d+)\s*x?\s+)?(.+?)(?:\s+\(([A-Za-z0-9]{2,6})\)(?:\s+([A-Za-z0-9\-★]+))?)?(?:\s+\*[A-Za-z]+\*)*\s*$/u;
+const SKIP = new Set(["deck","commander","companion","sideboard","maybeboard","mainboard","main","tokens","considering","about"]);
+function parseDeck(text){
+  const out = []; let stop = false;
+  for (const raw of text.split(/\r?\n/)){
+    const line = raw.trim(); if (!line || line.startsWith("//") || line.startsWith("#")) continue;
+    const low = line.replace(/:$/, "").toLowerCase();
+    if (low.startsWith("sideboard") || low.startsWith("maybeboard") || low.startsWith("considering")) { stop = true; continue; }
+    if (SKIP.has(low)) { if (low === "deck" || low === "commander" || low === "mainboard" || low === "main") stop = false; continue; }
+    if (stop) continue;
+    const m = line.match(LINE_RE); if (!m || !m[2].trim()) continue;
+    out.push({qty: m[1] ? parseInt(m[1], 10) : 1, name: m[2].trim(), set: m[3] ? m[3].toLowerCase() : null, cn: m[4] || null});
+  }
+  return out;
+}
+
+// ---- Scryfall
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function getJSON(url, opts){ const r = await fetch(url, opts); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).details || ("HTTP " + r.status)); return r.json(); }
+async function lookupAll(entries){
+  const cards = new Array(entries.length).fill(null);
+  for (let i = 0; i < entries.length; i += 75){
+    const chunk = entries.slice(i, i + 75);
+    const ids = chunk.map(e => e.set && e.cn ? {set: e.set, collector_number: e.cn}
+      : e.set ? {name: e.name.split(" // ")[0], set: e.set} : {name: e.name.split(" // ")[0]});
+    const res = await getJSON("https://api.scryfall.com/cards/collection", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify({identifiers: ids})});
+    const nf = new Set((res.not_found || []).map(x => JSON.stringify(x)));
+    let k = 0;
+    ids.forEach((id, j) => { if (!nf.has(JSON.stringify(id))) cards[i + j] = res.data[k++]; });
+    await sleep(110);
+  }
+  for (let i = 0; i < entries.length; i++){            // second chance: fuzzy name
+    if (cards[i]) continue;
+    try { cards[i] = await getJSON("https://api.scryfall.com/cards/named?fuzzy=" + encodeURIComponent(entries[i].name.split(" // ")[0])); }
+    catch(e){ cards[i] = {error: e.message}; }
+    await sleep(110);
+  }
+  return cards;
+}
+function faceImages(card){
+  if (card.image_uris) return [{label: card.name, url: card.image_uris.png || card.image_uris.large}];
+  return (card.card_faces || []).filter(f => f.image_uris).map(f => ({label: f.name, url: f.image_uris.png || f.image_uris.large}));
+}
+
+// ---- images
+const imgCache = new Map();
+function loadImage(src){   // src: URL string or File
+  const key = typeof src === "string" ? src : src;
+  if (imgCache.has(key)) return imgCache.get(key);
+  const p = (async () => {
+    const blob = typeof src === "string" ? await (await fetch(src)).blob() : src;
+    const url = URL.createObjectURL(blob);
+    const img = new Image(); img.decoding = "async"; img.src = url;
+    await img.decode(); return img;
+  })();
+  imgCache.set(key, p); p.catch(() => imgCache.delete(key));
+  return p;
+}
+function prepArt(img, white){
+  // Print-ready files with bleed (TRC Studio / MPC) carry an equal border on every side: trim it.
+  let aw = img.naturalWidth, ah = img.naturalHeight, sx = 0, sy = 0;
+  const b = Math.round((1040 * aw - 745 * ah) / (2 * (1040 - 745)));
+  if (aw / ah > 0.725 && b > 0 && b < Math.min(aw, ah) / 8){ sx = sy = b; aw -= 2 * b; ah -= 2 * b; }
+  const c = document.createElement("canvas"); c.width = aw; c.height = ah;
+  const x = c.getContext("2d");
+  x.fillStyle = white ? "#fff" : "#000"; x.fillRect(0, 0, aw, ah);   // rounded corners -> border color
+  x.drawImage(img, sx, sy, aw, ah, 0, 0, aw, ah);
+  const con = +S.contrast || 1, sat = +S.saturation || 1;
+  if (Math.abs(con - 1) > 1e-3 || Math.abs(sat - 1) > 1e-3){
+    const d = x.getImageData(0, 0, aw, ah), p = d.data;
+    let sum = 0; for (let i = 0; i < p.length; i += 4) sum += 0.299 * p[i] + 0.587 * p[i+1] + 0.114 * p[i+2];
+    const mean = sum / (p.length / 4);
+    for (let i = 0; i < p.length; i += 4){
+      let r = p[i], g = p[i+1], bl = p[i+2];
+      if (Math.abs(con - 1) > 1e-3){ r = mean + (r - mean) * con; g = mean + (g - mean) * con; bl = mean + (bl - mean) * con; }
+      if (Math.abs(sat - 1) > 1e-3){ const l = 0.299 * r + 0.587 * g + 0.114 * bl; r = l + (r - l) * sat; g = l + (g - l) * sat; bl = l + (bl - l) * sat; }
+      p[i] = r; p[i+1] = g; p[i+2] = bl;
+    }
+    x.putImageData(d, 0, 0);
+  }
+  return c;
+}
+const page = document.createElement("canvas"); page.width = page.height = PAGE_PX;
+async function renderPage(src, back){
+  const img = await loadImage(src);
+  const art = prepArt(img, false);
+  const ctx = page.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, PAGE_PX, PAGE_PX);
+  const mm = v => (+v || 0) / 25.4 * DPI;
+  const dx = mm(back ? S.back_shift_right_mm : S.shift_right_mm), dy = mm(back ? S.back_shift_down_mm : S.shift_down_mm);
+  const rot = (+(back ? S.back_rotate_deg : S.rotate_deg) || 0) * Math.PI / 180;
+  const sc = (+S.scale_pct || 100) / 100;
+  const cx = PX(L.cx + L.cw / 2), cy = PX(L.cy + L.ch / 2);
+  ctx.translate(cx + dx, cy + dy); ctx.rotate(rot); ctx.scale(sc, sc); ctx.translate(-cx, -cy);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(PX(L.ex), PX(L.ey), PX(L.ex + L.ew) - PX(L.ex), PX(L.ey + L.eh) - PX(L.ey));
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(art, PX(L.cx), PX(L.cy), PX(L.cw), PX(L.ch));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const blob = await new Promise(r => page.toBlob(r, "image/jpeg", 0.95));
+  const url = URL.createObjectURL(blob);
+  const pv = $("preview"); if (pv.dataset.url) URL.revokeObjectURL(pv.dataset.url); pv.src = url; pv.dataset.url = url;
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+// ---- PDF: one 3.5" x 3.5" page per card, JPEG per page, identical pages share one image
+function makePdf(pages){   // pages: [{jpeg: Uint8Array}] (same object reused for copies)
+  const enc = new TextEncoder(), chunks = [], offsets = []; let pos = 0;
+  const put = d => { const b = typeof d === "string" ? enc.encode(d) : d; chunks.push(b); pos += b.length; };
+  const obj = (id, ...parts) => { offsets[id] = pos; put(id + " 0 obj\n"); parts.forEach(put); put("\nendobj\n"); };
+  put("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n");
+  let next = 3; const imgIds = new Map(), pageIds = []; const pt = (L.page * 72).toFixed(4);
+  for (const p of pages){
+    if (!imgIds.has(p)){
+      const id = next++; imgIds.set(p, id);
+      obj(id, `<< /Type /XObject /Subtype /Image /Width ${PAGE_PX} /Height ${PAGE_PX} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpeg.length} >>\nstream\n`, p.jpeg, "\nendstream");
+    }
+    const content = `q ${pt} 0 0 ${pt} 0 0 cm /Im0 Do Q`;
+    const cid = next++; obj(cid, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    const pid = next++; pageIds.push(pid);
+    obj(pid, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pt} ${pt}] /Resources << /XObject << /Im0 ${imgIds.get(p)} 0 R >> >> /Contents ${cid} 0 R >>`);
+  }
+  obj(2, `<< /Type /Pages /Kids [${pageIds.map(i => i + " 0 R").join(" ")}] /Count ${pageIds.length} >>`);
+  obj(1, "<< /Type /Catalog /Pages 2 0 R /ViewerPreferences << /PrintScaling /None >> >>");
+  const xref = pos; let x = `xref\n0 ${next}\n0000000000 65535 f \n`;
+  for (let i = 1; i < next; i++) x += String(offsets[i] || 0).padStart(10, "0") + " 00000 n \n";
+  put(x + `trailer\n<< /Size ${next} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(chunks, {type: "application/pdf"});
+}
+
+// ---- deliver: Save (download) and Print / Share (iPad share sheet)
+function addPartRow(title, files){
+  const row = document.createElement("div"); row.className = "part";
+  const b = document.createElement("b"); b.textContent = title; row.appendChild(b);
+  for (const f of files){
+    const save = document.createElement("button"); save.type = "button"; save.textContent = "Save " + f.kind;
+    save.addEventListener("click", () => { const a = document.createElement("a"); a.href = URL.createObjectURL(f.blob);
+      a.download = f.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000); });
+    row.appendChild(save);
+    const file = new File([f.blob], f.name, {type: "application/pdf"});
+    if (navigator.canShare && navigator.canShare({files: [file]})){
+      const sh = document.createElement("button"); sh.type = "button"; sh.className = "primary"; sh.textContent = "Print / Share " + f.kind;
+      sh.addEventListener("click", () => navigator.share({files: [file]}).catch(() => {}));
+      row.appendChild(sh);
+    }
+  }
+  $("parts").appendChild(row);
+}
+
+// ---- the job
+let stopFlag = false;
+async function build(testOnly){
+  stopFlag = false; clearLog(); $("parts").textContent = "";
+  const prog = $("prog"); prog.hidden = false; prog.value = 0;
+  let entries = parseDeck($("deck").value);
+  if (/moxfield\.com\/decks\//i.test($("deck").value) && !entries.filter(e => !/moxfield/i.test(e.name)).length)
+    throw new Error("Moxfield links can't be read from here. In Moxfield tap Export → Copy for MTGA, then paste the list.");
+  entries = entries.filter(e => !/^https?:/i.test(e.name));
+  if (S.skip_basics) entries = entries.filter(e => !BASICS.has(e.name.toLowerCase()));
+  let customs = artFiles.slice();
+  if (testOnly){ if (entries.length){ entries = entries.slice(0, 1); customs = []; } else customs = customs.filter(f => !/\[back\]|\{back\}/i.test(f.name)).slice(0, 1); }
+  const units = [], problems = [];
+  if (entries.length){
+    log(`Looking up ${entries.length} card${entries.length > 1 ? "s" : ""} on Scryfall…`);
+    const cards = await lookupAll(entries);
+    entries.forEach((e, i) => {
+      const card = cards[i];
+      if (!card || card.error){ problems.push(`${e.name}: not found${card && card.error ? " (" + card.error + ")" : ""}`); log(`  !!  ${e.name}: not found`, "bad"); return; }
+      const faces = faceImages(card);
+      if (!faces.length){ problems.push(`${e.name}: no image on Scryfall`); return; }
+      const dfc = DFC_LAYOUTS.has(card.layout) && faces.length >= 2;
+      log(`  ok  ${card.name}  (${card.set.toUpperCase()} ${card.collector_number})${dfc ? "   << DOUBLE-FACED" : ""}`);
+      units.push({faces, dfc, copies: S.one_each || testOnly ? 1 : e.qty, label: card.name});
+    });
+  }
+  // own art: "3x Name.png" copies, "Name [Back].png" backs
+  const stemOf = n => n.replace(/\.[^.]+$/, "");
+  const COPIES = /^\s*(\d+)\s*[x\-_ ]\s*/i, BACKTAG = /\s*[\[{]back[\]}]\s*$/i;
+  const backs = new Map();
+  for (const f of customs){ const s = stemOf(f.name); if (BACKTAG.test(s)) backs.set(s.replace(BACKTAG, "").toLowerCase(), f); }
+  for (const f of customs){
+    const s = stemOf(f.name); if (BACKTAG.test(s)) continue;
+    const m = s.match(COPIES), bare = s.replace(COPIES, "");
+    const back = backs.get(s.toLowerCase()) || backs.get(bare.toLowerCase()) || null;
+    units.push({own: f, back, dfc: !!back, copies: S.one_each || testOnly ? 1 : (m ? parseInt(m[1], 10) : 1), label: s});
+  }
+  if (!units.length) throw new Error("Nothing to print. Paste a decklist or add your own art.");
+  units.sort((a, b) => (b.dfc ? 1 : 0) - (a.dfc ? 1 : 0));   // double-faced first (stable)
+
+  // items: one per printed face
+  const items = [];
+  for (const u of units){
+    if (u.own) items.push({front: u.own, back: u.back, copies: u.copies, dfc: u.dfc, label: u.label});
+    else if (u.dfc) items.push({front: u.faces[0].url, back: u.faces[1].url, copies: u.copies, dfc: true, label: u.label});
+    else for (const f of u.faces) items.push({front: f.url, back: null, copies: u.copies, dfc: false, label: f.label});
+  }
+  let common = null;
+  if (S.back_mode === "standard") common = STANDARD_BACK;
+  else if (S.back_mode === "file"){ if (backFile) common = backFile; else log("No back image chosen, so only double-faced cards get backs.", "warn"); }
+
+  // batches of about batch_size printed cards
+  const size = testOnly ? 1 : Math.max(1, S.batch_size | 0 || 20);
+  const batches = []; let cur = [], n = 0;
+  for (const it of items){ cur.push(it); n += it.copies; if (n >= size){ batches.push(cur); cur = []; n = 0; } }
+  if (cur.length) batches.push(cur);
+  const total = items.reduce((a, it) => a + it.copies, 0);
+  const dfcN = items.filter(i => i.dfc).reduce((a, it) => a + it.copies, 0);
+  if (dfcN) log(`Double-faced: ${dfcN} card(s), placed FIRST, with their backs in the BACKS file.`);
+  if (batches.length > 1) log(`${total} cards → ${batches.length} parts. Each part is ready to print as soon as it appears.`);
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ").replace(":", "");
+  const name = testOnly ? "Test card" : "Cards " + stamp;
+  const rendered = new Map(), renderedBack = new Map();
+  const getPage = async (src, back) => { const m = back ? renderedBack : rendered;
+    if (!m.has(src)) m.set(src, {jpeg: await renderPage(src, back)}); return m.get(src); };
+  let pageNo = 0, done = 0, backsRunning = true;
+  for (let bi = 0; bi < batches.length; bi++){
+    const fronts = [], bks = [];
+    for (const it of batches[bi]){
+      if (stopFlag) throw new Error("Stopped.");
+      try {
+        log(`  preparing ${it.label}`);
+        const pg = await getPage(it.front, false);
+        for (let c = 0; c < it.copies; c++) fronts.push(pg);
+        if (backsRunning){
+          const bsrc = it.back || common;
+          if (bsrc){ const bp = await getPage(bsrc, true); for (let c = 0; c < it.copies; c++) bks.push(bp); }
+          else backsRunning = false;
+        }
+      } catch(e){ problems.push(`${it.label}: ${e.message || e}`); log(`  !!  ${it.label}: couldn't load the image`, "bad"); }
+      done += it.copies; prog.value = done / total;
+      await sleep(0);
+    }
+    if (S.backs_reverse) bks.reverse();
+    const first = pageNo + 1; pageNo += fronts.length;
+    const multi = batches.length > 1;
+    const title = multi ? `Part ${String(bi + 1).padStart(2, "0")} · cards ${first}–${pageNo}` : `${fronts.length} card${fronts.length === 1 ? "" : "s"}`;
+    const files = [];
+    if (fronts.length) files.push({kind: "fronts", blob: makePdf(fronts),
+      name: multi ? `${name} Part ${String(bi + 1).padStart(2, "0")} FRONTS (cards ${first}-${pageNo}).pdf` : `${name} FRONTS.pdf`});
+    if (bks.length) files.push({kind: "backs", blob: makePdf(bks),
+      name: multi ? `${name} Part ${String(bi + 1).padStart(2, "0")} BACKS (cards ${first}-${first + bks.length - 1}).pdf` : `${name} BACKS.pdf`});
+    if (files.length){ addPartRow(title, files); log(`READY: ${title}: ${fronts.length} fronts${bks.length ? " + " + bks.length + " backs" : ""}`, "ok"); }
+  }
+  if (problems.length){ log("\nCouldn't print:", "warn"); problems.forEach(p => log("  " + p, "warn")); }
+  log("\nDone. Tap Print / Share on each part, in order.", "ok");
+}
+async function run(testOnly){
+  const btns = [$("go"), $("test")]; btns.forEach(b => b.disabled = true); $("stop").hidden = false;
+  try { await build(testOnly); }
+  catch(e){ log(String(e.message || e), "bad"); }
+  finally { btns.forEach(b => b.disabled = false); $("stop").hidden = true; $("prog").hidden = true; }
+}
+$("go").addEventListener("click", () => run(false));
+$("test").addEventListener("click", () => run(true));
+$("stop").addEventListener("click", () => { stopFlag = true; });
+</script>
+</body>
+</html>
