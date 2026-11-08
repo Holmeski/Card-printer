@@ -264,7 +264,19 @@ function loadImage(src){   // src: URL string or File
   const key = typeof src === "string" ? src : src;
   if (imgCache.has(key)) return imgCache.get(key);
   const p = (async () => {
-    const blob = typeof src === "string" ? await (await fetch(src)).blob() : src;
+    let blob = src;
+    if (typeof src === "string"){
+      // spotty hotel / cellular connections: retry, then fall back to Scryfall's smaller JPEG
+      const urls = [src, src, src];
+      if (src.includes("/png/")) urls.push(src.replace("/png/", "/large/").replace(".png", ".jpg"), src.replace("/png/", "/large/").replace(".png", ".jpg"));
+      let lastErr;
+      for (let i = 0; i < urls.length; i++){
+        try { const r = await fetch(urls[i], {cache: i ? "reload" : "default"}); if (!r.ok) throw new Error("HTTP " + r.status);
+          blob = await r.blob(); lastErr = null; if (i >= 3) log("    (used the smaller image; connection was dropping)", "warn"); break; }
+        catch(e){ lastErr = e; await sleep(800 * (i + 1)); }
+      }
+      if (lastErr) throw new Error("couldn't download the card image. Check the iPad has internet (not the printer's DIRECT Wi-Fi) and try again");
+    }
     const url = URL.createObjectURL(blob);
     const img = new Image(); img.decoding = "async"; img.src = url;
     await img.decode(); return img;
